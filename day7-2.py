@@ -72,8 +72,6 @@ if __name__ == "__main__":
         workers = [Worker() for i in range(5)]
         time = 0
         while jobs_in_progress or jobs_pending:
-            #print(jobs_in_progress)
-            #print(jobs_pending)
             for worker in workers:
                 if worker.current_job is not None and worker.jobDone(time):
                     jobs_in_progress.remove(worker.current_job)
@@ -89,11 +87,10 @@ if __name__ == "__main__":
                     jobs_pending.remove(next_job)
                     worker.assignJob(next_job,time + duration)
                     jobs_in_progress.add(next_job)
-                    print("Assigned job " + next_job + " at time " + str(time))
 
             time += 1
 
-        print("Completed in " + str(time) + " seconds.")
+        print("Completed in " + str(time - 1) + " seconds.")
         print(completed)
     else:
         print("Usage:  " + sys.argv[0] + " <data-file>")
