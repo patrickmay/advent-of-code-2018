@@ -58,7 +58,7 @@ if __name__ == "__main__":
             i += 1
 
         print("Dimensions after "
-              + str(i)
+              + str(i - 1)
               + " seconds:  ("
               + str(min_x)
               + ", "
