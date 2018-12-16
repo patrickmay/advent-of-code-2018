@@ -32,7 +32,7 @@ class Combatant:
     def damage(self,amount):
         self.hit_points_ -= amount
         if self.hit_points_ <= 0:
-            self.map_.remove_combatant(self)
+            self.map_.cull()
 
     def targets(self):
         # Return a list of all targets in the list.
@@ -55,10 +55,6 @@ class Combatant:
         targets = [target for target in self.targets()
                    if (target.location() in adjacent_squares
                        and target.id() != self.id_)]
-        # print("attack:  all adjacent targets = "
-        #       + str([target.location() for target in targets]))
-        # print("attack:  hit points = "
-        #       + str([target.hit_points() for target in targets]))
         if len(targets) > 0:
             targets.sort(key=lambda target: target.hit_points())
             targets = [target for target in targets
@@ -75,6 +71,7 @@ class Combatant:
                         matrix = None):
         # Return a matrix with the distances to COORDINATE from this
         # combatant's location.
+        # New and improved, using BFS.
         x, y = coordinate
         if distance is None:
             distance = 0
@@ -83,56 +80,90 @@ class Combatant:
 
         if self.map_.value(x,y) != '.':
             matrix[x][y] = None
-        elif ((not (x in matrix and y in matrix[x]))
-              or (matrix[x][y] is None)
-              or (matrix[x][y] > distance)):
+        elif (not (x in matrix and y in matrix[x])):
             matrix[x][y] = distance
             for neighbor in self.map_.unoccupied_neighbors(x,y):
-                matrix = self.distance_matrix(neighbor,distance + 1,matrix)
+                if (not (neighbor[0] in matrix
+                         and neighbor[1] in matrix[neighbor[0]])):
+                    matrix = self.distance_matrix(neighbor,distance + 1,matrix)
 
         return matrix
-                
+
+    def old_move(self):
+        # If next to a target, attack.  Otherwise, move toward the
+        # nearest target.  If no targets are found, return False.
+        target_count = sum([1 for combatant in self.map_.combatants()
+                            if combatant.id() != self.id_])
+        if target_count > 0:
+            target_squares = self.target_adjacent_squares()
+            if len(target_squares) > 0:
+                target_squares.sort(key=lambda target: tuple(reversed(target)))
+                if self.location_ in target_squares:
+                    self.attack()
+                else:
+                    distances = [self.distance_matrix(square)
+                                 for square in target_squares
+                                 if self.map_.value(square[0],square[1]) == '.']
+
+                    path_starts = self.map_.unoccupied_neighbors(self.x(),
+                                                                 self.y())
+                    path_starts.sort(key=lambda start: tuple(reversed(start)))
+                    next_location = None
+                    shortest_path = -1
+                    for matrix in distances:
+                        for start in path_starts:
+                            x, y = start
+                            if (((x in matrix) and (y in matrix[x]))
+                                and matrix[x][y] is not None
+                                and ((shortest_path == -1)
+                                     or (matrix[x][y] < shortest_path))):
+                                next_location = start
+                                shortest_path = matrix[x][y]
+                    if next_location is not None:
+                        self.location_ = next_location
+                        if self.location_ in target_squares:
+                            self.attack()
+                    
+        return (target_count > 0)
+            
     def move(self):
         # If next to a target, attack.  Otherwise, move toward the
         # nearest target.  If no targets are found, return False.
-        target_squares = self.target_adjacent_squares()
-        if self.location_ in target_squares:
-            self.attack()
-        else:
-            distances = [self.distance_matrix(square)
-                         for square in target_squares
-                         if self.map_.value(square[0],square[1]) == '.']
-
-            # for distance in distances:
-            #     for j in range(self.map_.height()):
-            #         for i in range(self.map_.width()):
-            #             if i in distance and j in distance[i]:
-            #                 print(" " + str(distance[i][j]) + " ",end='')
-            #             else:
-            #                 print(" . ",end='')
-            #         print()
-            #     print()
-                            
-            path_starts = self.map_.unoccupied_neighbors(self.x(),self.y())
-            next_location = None
-            shortest_path = -1
-            sorted_starts = sorted(path_starts,
-                                   key=lambda start: tuple(reversed(start)))
-            for start in sorted_starts:
-                for matrix in distances:
-                    x, y = start
-                    if ((x in matrix) and (y in matrix[x])
-                        and matrix[x][y] is not None):
-                        if ((shortest_path == -1)
-                            or (matrix[x][y] < shortest_path)):
-                            next_location = start
-                            shortest_path = matrix[x][y]
-            if next_location is not None:
-                self.location_ = next_location
+        target_count = sum([1 for combatant in self.map_.combatants()
+                            if combatant.id() != self.id_])
+        if target_count > 0:
+            target_squares = self.target_adjacent_squares()
+            if len(target_squares) > 0:
+                target_squares.sort(key=lambda target: tuple(reversed(target)))
                 if self.location_ in target_squares:
                     self.attack()
+                else:
+                    distances = [self.distance_matrix(square)
+                                 for square in target_squares
+                                 if self.map_.value(square[0],square[1]) == '.']
+
+                    path_starts = self.map_.unoccupied_neighbors(self.x(),
+                                                                 self.y())
+                    path_starts.sort(key=lambda start: tuple(reversed(start)))
+                    next_location = None
+                    shortest_path = -1
+                    print("target squares = " + str(target_squares))
+                    print("path starts = " + str(path_starts))
+                    for matrix in distances:
+                        for start in path_starts:
+                            x, y = start
+                            if (((x in matrix) and (y in matrix[x]))
+                                and matrix[x][y] is not None
+                                and ((shortest_path == -1)
+                                     or (matrix[x][y] < shortest_path))):
+                                next_location = start
+                                shortest_path = matrix[x][y]
+                    if next_location is not None:
+                        self.location_ = next_location
+                        if self.location_ in target_squares:
+                            self.attack()
                     
-        return (len(target_squares) > 0)
+        return (target_count > 0)
             
             
 class Elf(Combatant):
@@ -179,7 +210,8 @@ class Map:
     def add_combatant(self,combatant):
         self.combatants_.append(combatant)
     
-    def remove_combatant(self,dead_combatant):
+    def cull(self):
+        # Remove dead combatants
         self.combatants_ = [combatant for combatant in self.combatants_
                             if combatant.hit_points() > 0]
     
@@ -249,29 +281,26 @@ def parse_starting_map(filename):
     return starting_map
 
 
+# For the test data, this should give 76 rounds with 2656 hit points
+# remaining for a score of 201856.
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         cave_map = parse_starting_map(sys.argv[1])
-        cave_map.display()
-        print("Combatant locations:")
-        print([combatant.location() for combatant in cave_map.combatants()])
-        print([combatant.hit_points() for combatant in cave_map.combatants()])
-
         round = 0
         done = False
+        # cave_map.display()
+        # while round < 28:
         while not done:
             for combatant in cave_map.combatants():
-                print("Combatant "
-                      + str(combatant.id())
-                      + " at "
-                      + str(combatant.location()))
-                if not combatant.move():
-                    done = True
-                    break
+                if combatant.hit_points() > 0:
+                    if not combatant.move():
+                        done = True
+                        break
             if not done:
                 round += 1
-                print("Round " + str(round) + " complete.")
-
+            print("Round " + str(round) + " complete.")
+            cave_map.display()
+            
         remaining_hit_points = sum([combatant.hit_points()
                                     for combatant in cave_map.combatants()])
         print("Combat ended after "
@@ -281,5 +310,6 @@ if __name__ == "__main__":
               + " hit points remaining ("
               + str(round * remaining_hit_points)
               + ").")
+        cave_map.display()
     else:
         print("Usage:  " + sys.argv[0] + " <data-file>")
