@@ -26,6 +26,14 @@ class Combatant:
     def y(self):
         return self.location_[1]
 
+    def hit_points(self):
+        return self.hit_points_
+
+    def damage(self,amount):
+        self.hit_points_ -= amount
+        if self.hit_points_ <= 0:
+            self.map_.remove_combatant(self)
+
     def targets(self):
         # Return a list of all targets in the list.
         return [combatant for combatant in self.map_.combatants()
@@ -36,23 +44,44 @@ class Combatant:
         open_squares = list()
         target_squares = [combatant.location() for combatant in self.targets()]
         for square in target_squares:
-            for neighbor in self.map_.unoccupied_neighbors(square[0],square[1]):
+            for neighbor in self.map_.open_neighbors(square[0],square[1]):
                 open_squares.append(neighbor)
 
         return open_squares
 
     def attack(self):
-        pass
+        # Attack the adjacent target with the fewest hit points.
+        adjacent_squares = self.map_.open_neighbors(self.x(),self.y())
+        targets = [target for target in self.targets()
+                   if (target.location() in adjacent_squares
+                       and target.id() != self.id_)]
+        # print("attack:  all adjacent targets = "
+        #       + str([target.location() for target in targets]))
+        # print("attack:  hit points = "
+        #       + str([target.hit_points() for target in targets]))
+        if len(targets) > 0:
+            targets.sort(key=lambda target: target.hit_points())
+            targets = [target for target in targets
+                       if target.hit_points() == targets[0].hit_points()]
+            # print("attack:  lowest hit points = "
+            #       + str([target.hit_points() for target in targets]))
+            targets.sort(key=lambda target: tuple(reversed(target.location())))
+            target = targets[0]
+            target.damage(self.attack_power_)
 
     def distance_matrix(self,
                         coordinate,
-                        distance = 0,
-                        matrix = defaultdict(lambda: defaultdict())):
+                        distance = None,
+                        matrix = None):
         # Return a matrix with the distances to COORDINATE from this
         # combatant's location.
-        print("distance_matrix:  " + str(coordinate) + ", " + str(distance))
         x, y = coordinate
-        if (distance != 0) and (self.map_.value(x,y) != '.'):
+        if distance is None:
+            distance = 0
+        if matrix is None:
+            matrix = defaultdict(lambda: defaultdict())
+
+        if self.map_.value(x,y) != '.':
             matrix[x][y] = None
         elif ((not (x in matrix and y in matrix[x]))
               or (matrix[x][y] is None)
@@ -61,45 +90,49 @@ class Combatant:
             for neighbor in self.map_.unoccupied_neighbors(x,y):
                 matrix = self.distance_matrix(neighbor,distance + 1,matrix)
 
-        print("Distances for " + str(coordinate)
-              + " (starting = " + str(distance) + ")")
-        for i in matrix:
-            for j in matrix[i]:
-                print(str((i, j)) + ":  " + str(matrix[i][j]))
         return matrix
                 
     def move(self):
         # If next to a target, attack.  Otherwise, move toward the
-        # nearest target.
+        # nearest target.  If no targets are found, return False.
         target_squares = self.target_adjacent_squares()
-        print("Target squares = " + str(target_squares))
         if self.location_ in target_squares:
             self.attack()
         else:
             distances = [self.distance_matrix(square)
-                         for square in target_squares]
+                         for square in target_squares
+                         if self.map_.value(square[0],square[1]) == '.']
+
+            # for distance in distances:
+            #     for j in range(self.map_.height()):
+            #         for i in range(self.map_.width()):
+            #             if i in distance and j in distance[i]:
+            #                 print(" " + str(distance[i][j]) + " ",end='')
+            #             else:
+            #                 print(" . ",end='')
+            #         print()
+            #     print()
+                            
             path_starts = self.map_.unoccupied_neighbors(self.x(),self.y())
             next_location = None
             shortest_path = -1
             sorted_starts = sorted(path_starts,
                                    key=lambda start: tuple(reversed(start)))
-            print("Start squares = " + str(sorted_starts))
             for start in sorted_starts:
                 for matrix in distances:
                     x, y = start
                     if ((x in matrix) and (y in matrix[x])
                         and matrix[x][y] is not None):
-                        print("Start = " + str(start))
-                        print("Matrix distance = " + str(matrix[x][y]))
                         if ((shortest_path == -1)
                             or (matrix[x][y] < shortest_path)):
                             next_location = start
                             shortest_path = matrix[x][y]
             if next_location is not None:
-                print("Moving from " + str(self.location_) + " to " + str(next_location) + " (distance = " + str(shortest_path) + ")")
                 self.location_ = next_location
                 if self.location_ in target_squares:
                     self.attack()
+                    
+        return (len(target_squares) > 0)
             
             
 class Elf(Combatant):
@@ -116,7 +149,13 @@ class Map:
     def __init__(self):
         self.map_ = defaultdict(lambda: defaultdict())
         self.combatants_ = list()
-        
+
+    def width(self):
+        return len(self.map_)
+
+    def height(self):
+        return len(self.map_[0])
+
     def value(self,x,y):
         symbol = self.map_[x][y]
         combatant = [combatant for combatant in self.combatants_
@@ -140,8 +179,9 @@ class Map:
     def add_combatant(self,combatant):
         self.combatants_.append(combatant)
     
-    def remove_combatant(self,combatant):
-        pass
+    def remove_combatant(self,dead_combatant):
+        self.combatants_ = [combatant for combatant in self.combatants_
+                            if combatant.hit_points() > 0]
     
     def display(self):
         # Print the contents of the Map to the screen.
@@ -211,24 +251,35 @@ def parse_starting_map(filename):
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
-        starting_map = parse_starting_map(sys.argv[1])
-        starting_map.display()
+        cave_map = parse_starting_map(sys.argv[1])
+        cave_map.display()
         print("Combatant locations:")
-        print([combatant.location() for combatant in starting_map.combatants()])
+        print([combatant.location() for combatant in cave_map.combatants()])
+        print([combatant.hit_points() for combatant in cave_map.combatants()])
 
-        for combatant in starting_map.combatants():
-            combatant.move()
-        starting_map.display()
+        round = 0
+        done = False
+        while not done:
+            for combatant in cave_map.combatants():
+                print("Combatant "
+                      + str(combatant.id())
+                      + " at "
+                      + str(combatant.location()))
+                if not combatant.move():
+                    done = True
+                    break
+            if not done:
+                round += 1
+                print("Round " + str(round) + " complete.")
 
-        print([combatant.location() for combatant in starting_map.combatants()])
-        for combatant in starting_map.combatants():
-            print("Moving combatant at " + str(combatant.location()))
-            combatant.move()
-        starting_map.display()
-        
-        print([combatant.location() for combatant in starting_map.combatants()])
-        for combatant in starting_map.combatants():
-            combatant.move()
-        starting_map.display()
+        remaining_hit_points = sum([combatant.hit_points()
+                                    for combatant in cave_map.combatants()])
+        print("Combat ended after "
+              + str(round)
+              + " rounds.  The winning group has "
+              + str(remaining_hit_points)
+              + " hit points remaining ("
+              + str(round * remaining_hit_points)
+              + ").")
     else:
         print("Usage:  " + sys.argv[0] + " <data-file>")
