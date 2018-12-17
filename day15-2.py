@@ -255,9 +255,14 @@ def parse_starting_map(filename):
 # For the test data, this should give 76 rounds with 2656 hit points
 # remaining for a score of 201856.
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 3:
         cave_map = parse_starting_map(sys.argv[1])
-        cave_map.display()
+        elf_attack_power = int(sys.argv[2])
+        starting_elves = 0
+        for combatant in cave_map.combatants():
+            if combatant.id() == 'E':
+                combatant.attack_power_ = elf_attack_power
+                starting_elves += 1
         round = 0
         done = False
         while not done:
@@ -269,7 +274,6 @@ if __name__ == "__main__":
             if not done:
                 round += 1
             print("Round " + str(round) + " complete.")
-            cave_map.display()
             
         remaining_hit_points = sum([combatant.hit_points()
                                     for combatant in cave_map.combatants()])
@@ -280,6 +284,10 @@ if __name__ == "__main__":
               + " hit points remaining ("
               + str(round * remaining_hit_points)
               + ").")
-        cave_map.display()
+        print("Lost "
+              + str(starting_elves
+                    - sum([1 for combatant in cave_map.combatants()
+                           if combatant.id() == 'E']))
+              + " elves.")
     else:
-        print("Usage:  " + sys.argv[0] + " <data-file>")
+        print("Usage:  " + sys.argv[0] + " <data-file> <elf-attack-power>")
