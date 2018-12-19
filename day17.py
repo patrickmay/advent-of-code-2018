@@ -67,91 +67,116 @@ class GroundMap:
                     self.map_[i][j] = '.'
 
     def display(self):
-        for j in range(self.height_[0] - 1,self.height_[1] + 2):
+        # for j in range(self.height_[0] - 1,self.height_[1] + 2):
+        for j in range(0,self.height_[1] + 2):
             for i in range(self.width_[0] - 1,self.width_[1] + 2):
                 if i in self.map_ and j in self.map_[i]:
                     print(self.map_[i][j],end='')
                 else:
                     print(".",end='')
-                    
-            print()
+            print(" (" + str(j) + ")")
 
     def flow_left(self,x,y):
-        if x - 1 >= self.width_[0]:
-            if self.map_[x - 1][y] == '.':
-                if self.map_[x - 1][y + 1] in ['#','~']:
-                    self.map_[x - 1][y] = '~'
-                    self.flow_left(x - 1,y)
-                else:
-                    self.map_[x - 1][y] = '|'
+        left_drain = None
+        leftmost = None
 
-    def flow_right(self,x,y):
-        if x + 1 <= self.width_[1]:
-            if self.map_[x + 1][y] == '.':
-                if self.map_[x + 1][y + 1] in ['#','~']:
-                    self.map_[x + 1][y] = '~'
-                    self.flow_right(x + 1,y)
-                else:
-                    self.map_[x + 1][y] = '|'
-    
-    def flow_down(self,x = None,y = None,seen = None):
-        if x is None and y is None:
-            x, y = list(self.water_source_)
-        if seen is None:
-            seen = set()
-        flowed = True
-
-        if (x,y) in seen:
-            flowed = False
-        elif y < self.height_[1] and self.map_[x][y + 1] in ['#','~']:
-            seen.add((x,y))
+        if x > self.width_[0] and y < self.height_[1]:
             if self.map_[x][y] in ['.','|']:
-                self.map_[x][y] = '~'
-            self.flow_left(x,y)
-            self.flow_right(x,y)
-        elif y < self.height_[1]:
-            seen.add((x,y))
-            self.map_[x][y + 1] = '|'
-            self.flow_down(x,y + 1,seen)
-        else:
-            flowed = False
+                self.map_[x][y] = '|'
+                if self.map_[x][y + 1] in ['.','|']:
+                    left_drain = (x,y)
+                    leftmost = x
+                elif (x - 1) < self.width_[0] or self.map_[x - 1][y] == '#':
+                    leftmost = x
+                else:
+                    left_drain, leftmost = self.flow_left(x - 1,y)
 
-        return flowed
+        return [left_drain,leftmost]
+    
+    def flow_right(self,x,y):
+        right_drain = None
+        rightmost = None
 
-    def flowing_water(self):
-        flowing = list()
+        if x <= self.width_[1] and y < self.height_[1]:
+            if self.map_[x][y] in ['.','|']:
+                self.map_[x][y] = '|'
+                if self.map_[x][y + 1] in ['.','|']:
+                    right_drain = (x,y)
+                    rightmost = x
+                elif (x + 1) > self.width_[1] or self.map_[x + 1][y] == '#':
+                    rightmost = x
+                else:
+                    right_drain, rightmost = self.flow_right(x + 1,y)
+
+        return [right_drain,rightmost]
+    
+    def flow_down(self,start = None):
+        if start is None:
+            start = self.water_source_
+        x, y = start
+        drains = set()
+
+        if y < self.height_[1]:
+            if self.map_[x][y] in ['+','|']:  # else already written over
+                if self.map_[x][y + 1] in ['#','~']:
+                    left_drain, leftmost = self.flow_left(x - 1,y)
+                    right_drain, rightmost = self.flow_right(x + 1,y)
+                    if left_drain is not None:
+                        drains.add(left_drain)
+                    elif leftmost is None:
+                        leftmost = x
+                    if right_drain is not None:
+                        drains.add(right_drain)
+                    elif rightmost is None:
+                        rightmost = x
+                    if len(drains) == 0:
+                        for i in range(leftmost,rightmost + 1):
+                            self.map_[i][y] = '~'
+                            if self.map_[i][y - 1] == '|':
+                                drains.add((i,y - 1))
+                elif self.map_[x][y + 1] in ['.','|']:
+                    self.map_[x][y + 1] = '|'
+                    drains.add((x,y + 1))
+            
+        return drains
+
+    def flow(self):
+        drains = self.flow_down()
+        while len(drains) > 0:
+            new_drains = set()
+            for drain in drains:
+                for new_drain in self.flow_down(drain):
+                    new_drains.add(new_drain)
+            drains = new_drains
+
+    def wet_tiles(self):
+        count = 0
         for i in range(self.width_[0],self.width_[1] + 1):
             for j in range(self.height_[0],self.height_[1] + 1):
-                if self.map_[i][j] == '|':
-                    flowing.append((i,j))
+                if self.map_[i][j] in ['|','~']:
+                    count += 1
 
-        return flowing
-    
-    def flow(self):
-        done = False
-        while not done:
-            self.flow_down()
-            flowing = self.flowing_water()
-            flowing.sort(key=lambda flow: tuple(reversed(flow)),reverse=True)
-            lowest = flowing[0][1]  # largest y coordinate
-            flowing = [flow for flow in flowing if flow[1] == lowest]
-            results = list()
-            for flow in flowing:
-                results.append(self.flow_down(flow[0],flow[1]))
-            done = True not in results
+        return count
+
+    def water_tiles(self):
+        count = 0
+        for i in range(self.width_[0],self.width_[1] + 1):
+            for j in range(self.height_[0],self.height_[1] + 1):
+                if self.map_[i][j] == '~':
+                    count += 1
+
+        return count
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         clay, width, height = parse_clay(sys.argv[1])
+        width[0] = 0
+        width[1] += 1
         water = (500,0)
-        print(len(clay))
-        print(width)
-        print(height)
         ground_map = GroundMap(width,height,water,clay)
-        ground_map.display()
-        print()
         ground_map.flow()
-        ground_map.display()
+        print("Water can reach " + str(ground_map.wet_tiles()) + " tiles.")
+        print("Water is in " + str(ground_map.water_tiles()) + " tiles.")
     else:
         print("Usage:  " + sys.argv[0] + " <data-file>")
