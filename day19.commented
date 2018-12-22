@@ -1,0 +1,104 @@
+#ip 4
+ 0) addi 4 16 4    ; ip += 16  (goto line 16 + 1)
+ 1) seti 1 3 5     ; r5 = 1
+ 2) seti 1 1 3     ; r3 = 1
+
+ 3) mulr 5 3 1     ; r1 = r5 * r3 (== r5)
+ 
+ 4) eqrr 1 2 1
+ 5) addr 1 4 4     ; ip += r1  (if r1 == r2, goto line 6 + 1)
+                   ; Since r1 == r5, this tests if r2 == r5 (the first time).
+ 
+ 6) addi 4 1 4     ; ip += 1  (goto line 7 + 1)
+ 7) addr 5 0 0     ; r0 += r5
+ 8) addi 3 1 3     ; r3 += 1
+
+ 9) gtrr 3 2 1
+10) addr 4 1 4     ; ip += r1  (if r3 > r2, goto line 11 + 1)
+
+11) seti 2 8 4     ; ip = 2  (goto line 2 + 1)
+; start of abnormal loop
+12) addi 5 1 5     ; r5 += 1
+
+13) gtrr 5 2 1
+14) addr 1 4 4     ; ip += r1  (if r5 > r2, goto line 15 + 1)
+                   ; So, the program ends when r5 > r2 (which always
+                   ; equals 10551386).  That means we need to find the
+                   ; value of r0 when r5 = 10551387.
+
+15) seti 1 3 4     ; ip = 1  (goto line 1 + 1)
+; end of abnormal loop
+16) mulr 4 4 4     ; ip *= ip (end)
+17) addi 2 2 2
+18) mulr 2 2 2
+19) mulr 4 2 2
+20) muli 2 11 2
+21) addi 1 6 1
+22) mulr 1 4 1
+23) addi 1 18 1
+24) addr 2 1 2
+25) addr 4 0 4     ; ip += r0  (goto line r0 + 1)
+26) seti 0 3 4     ; ip = 0  (goto line 0 + 1)
+27) setr 4 5 1
+28) mulr 1 4 1
+29) addr 4 1 1
+30) mulr 4 1 1
+31) muli 1 14 1
+32) mulr 1 4 1
+33) addr 2 1 2
+34) seti 0 1 0     ; r0 = 0
+35) seti 0 4 4     ; ip = 0  (goto line 0 + 1)
+
+
+;; setup phase
+ip = 17, registers = [1, 0, 0, 0, 17, 0]  (0)
+ip = 18, registers = [1, 0, 2, 0, 18, 0]  (1)
+ip = 19, registers = [1, 0, 4, 0, 19, 0]  (2)
+ip = 20, registers = [1, 0, 76, 0, 20, 0]  (3)
+ip = 21, registers = [1, 0, 836, 0, 21, 0]  (4)
+ip = 22, registers = [1, 6, 836, 0, 22, 0]  (5)
+ip = 23, registers = [1, 132, 836, 0, 23, 0]  (6)
+ip = 24, registers = [1, 150, 836, 0, 24, 0]  (7)
+ip = 25, registers = [1, 150, 986, 0, 25, 0]  (8)
+ip = 27, registers = [1, 150, 986, 0, 27, 0]  (9)
+ip = 28, registers = [1, 27, 986, 0, 28, 0]  (10)
+ip = 29, registers = [1, 756, 986, 0, 29, 0]  (11)
+ip = 30, registers = [1, 785, 986, 0, 30, 0]  (12)
+ip = 31, registers = [1, 23550, 986, 0, 31, 0]  (13)
+ip = 32, registers = [1, 329700, 986, 0, 32, 0]  (14)
+ip = 33, registers = [1, 10550400, 986, 0, 33, 0]  (15)
+ip = 34, registers = [1, 10550400, 10551386, 0, 34, 0]  (16)
+ip = 35, registers = [0, 10550400, 10551386, 0, 35, 0]  (17)
+ip = 1, registers = [0, 10550400, 10551386, 0, 1, 0]  (18)
+ip = 2, registers = [0, 10550400, 10551386, 0, 2, 1]  (19)
+; then into 3-11 except 7 loop
+;; when 7 fires
+ip = 7, registers = [0, 1, 10551386, 10551386, 7, 1]  (84411103)
+.
+.
+.
+ip = 12, registers = [1, 1, 10551386, 10551387, 12, 1]  (84411107)
+ip = 13, registers = [1, 1, 10551386, 10551387, 13, 2]  (84411108)
+ip = 14, registers = [1, 0, 10551386, 10551387, 14, 2]  (84411109)
+ip = 15, registers = [1, 0, 10551386, 10551387, 15, 2]  (84411110)
+ip = 2, registers = [1, 0, 10551386, 10551387, 2, 2]  (84411111)
+. . .
+ip = 7, registers = [1, 1, 10551386, 5275693, 7, 2]  (126616651)
+. . .
+ip = 12, registers = [3, 1, 10551386, 10551387, 12, 2]  (168822199)
+ip = 13, registers = [3, 1, 10551386, 10551387, 13, 3]  (168822200)
+ip = 14, registers = [3, 0, 10551386, 10551387, 14, 3]  (168822201)
+ip = 15, registers = [3, 0, 10551386, 10551387, 15, 3]  (168822202)
+ip = 2, registers = [3, 0, 10551386, 10551387, 2, 3]  (168822203)
+. . .
+ip = 12, registers = [3, 1, 10551386, 10551387, 12, 3]  (253233291)
+ip = 13, registers = [3, 1, 10551386, 10551387, 13, 4]  (253233292)
+ip = 14, registers = [3, 0, 10551386, 10551387, 14, 4]  (253233293)
+ip = 15, registers = [3, 0, 10551386, 10551387, 15, 4]  (253233294)
+ip = 2, registers = [3, 0, 10551386, 10551387, 2, 4]  (253233295)
+. . .
+ip = 12, registers = [3, 1, 10551386, 10551387, 12, 4]  (337644383)
+ip = 13, registers = [3, 1, 10551386, 10551387, 13, 5]  (337644384)
+ip = 14, registers = [3, 0, 10551386, 10551387, 14, 5]  (337644385)
+ip = 15, registers = [3, 0, 10551386, 10551387, 15, 5]  (337644386)
+ip = 2, registers = [3, 0, 10551386, 10551387, 2, 5]  (337644387)
