@@ -123,8 +123,7 @@ class Device:
 
 
     def run(self):
-        # r = [1, 0, 0, 0, 0, 0]
-        r = [3, 1, 10551386, 10551387, 13, 10551386]
+        r = [1, 0, 0, 0, 0, 0]
         count = 0
         # while (r[self.ip_register_] < len(self.program_)
         #        and (count < 1000 or r[self.ip_register_] <= 11)):
@@ -132,23 +131,10 @@ class Device:
         #        and r[3] <= 10551388):
         while r[self.ip_register_] < len(self.program_):
             opcode, a, b, c = program[r[self.ip_register_]]
+            print(str(r) + " " + opcode + " ",end='')
             r = self.execute(opcode,r,a,b,c)
             r[self.ip_register_] += 1
-            print("ip = "
-                  + str(r[self.ip_register_])
-                  + ", registers = "
-                  + str(r)
-                  + "  ("
-                  + str(count)
-                  +")")
-            # if r[self.ip_register_] == 13:
-            #     print("ip = "
-            #           + str(r[self.ip_register_])
-            #           + ", registers = "
-            #           + str(r)
-            #           + "  ("
-            #           + str(count)
-            #           +")")
+            print(str(r) + "  (" + str(count) + ")")
             count += 1
         r[self.ip_register_] -= 1
 
